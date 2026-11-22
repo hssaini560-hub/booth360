@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -110,8 +110,18 @@
   .stBox.fail { background:#ffe8ec; color:#b4232c; } .stBox.fail .stDot { background:#ff3b5c; }
   .btnP:disabled { opacity:.45; box-shadow:none; }
 
-  #gear { position:fixed; top:max(16px,env(safe-area-inset-top)); right:16px; z-index:20; width:46px; height:46px; border-radius:50%; border:0; background:rgba(255,255,255,.85);
-    box-shadow:0 6px 20px rgba(0,0,0,.12); cursor:pointer; display:grid; place-items:center; opacity:.55; }
+  /* kiosk: only the camera and the play button are visible; settings open with a 2 s press in the top-right corner + code */
+  html,body { touch-action:manipulation; -webkit-touch-callout:none; overscroll-behavior:none; }
+  #app { padding:0; }
+  #frame { height:100%; width:100%; aspect-ratio:auto; border-radius:0; box-shadow:none; }
+  .brand:not(#cfgWarn), #evTitle, #idle .tapTxt { display:none !important; }
+  #hotCorner { position:fixed; top:0; right:0; width:90px; height:90px; z-index:25; }
+  #pinBox { position:fixed; inset:0; z-index:40; background:rgba(30,20,60,.55); display:none; align-items:center; justify-content:center; }
+  #pinBox.on { display:flex; }
+  #pinBox .glass { gap:12px; }
+  #pinIn { font-size:28px; letter-spacing:10px; text-align:center; width:200px; }
+  #gear { display:none !important; position:fixed; top:max(16px,env(safe-area-inset-top)); right:16px; z-index:20; width:46px; height:46px; border-radius:50%; border:0; background:rgba(255,255,255,.85);
+    box-shadow:0 6px 20px rgba(0,0,0,.12); cursor:pointer; place-items:center; opacity:.55; }
   #gear svg { width:22px; height:22px; }
   #settings { position:fixed; inset:0; z-index:30; background:rgba(30,20,60,.35); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); display:none; align-items:center; justify-content:center; padding:16px; }
   #settings.on { display:flex; }
@@ -199,6 +209,14 @@
 
 <button id="gear" onclick="openSettings()" aria-label="Reglages"><svg viewBox="0 0 24 24" fill="none" stroke="#1e1b33" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 
+<div id="hotCorner"></div>
+<div id="pinBox"><div class="glass">
+  <b>Code administrateur</b>
+  <input id="pinIn" type="password" inputmode="numeric" maxlength="8" autocomplete="off">
+  <div id="pinErr" style="color:#d12c4a;font-size:14px;min-height:18px"></div>
+  <div style="display:flex;gap:10px"><button class="btnG" onclick="closePin()">Annuler</button><button class="btnP" onclick="checkPin()">Ouvrir</button></div>
+</div></div>
+
 <div id="settings">
   <div class="card">
     <h3>Reglages</h3>
@@ -221,6 +239,7 @@
       <div class="row"><label>Titre de l'evenement</label><input id="sTitle" type="text" placeholder="ex: Mariage Sara & Adam"></div>
       <div class="row"><label>Google Drive (URL du script)</label><input id="sUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec"></div>
       <div class="row"><label>Cle secrete</label><input id="sToken" type="password"></div>
+      <div class="row"><label>Code administrateur</label><input id="sPin" type="text" inputmode="numeric" maxlength="8"></div>
     </div>
     <div class="info" id="sInfo"></div>
     <div class="actions">
@@ -238,7 +257,7 @@
 // uploads to Google Drive through the Apps Script web app, and shows QR codes for guests.
 var W = 720, H = 1280, FPS = 30;
 var $ = function (id) { return document.getElementById(id); };
-var DEF = { durationSec: 8, countdownSec: 3, effect: "360", slowSec: 3, reverseSec: 3, mirror: true, music: true, title: "", scriptUrl: "", token: "", camId: "" };
+var DEF = { durationSec: 8, countdownSec: 3, effect: "360", slowSec: 3, reverseSec: 3, mirror: true, music: true, title: "", scriptUrl: "", token: "", camId: "", pin: "1234" };
 var cfg = loadCfg(), stream = null, busy = false, autoTick = null, lastResult = null, musicOk = false, overlayImg = null;
 
 function loadCfg() {
@@ -567,7 +586,7 @@ async function openSettings() {
   $("sCam").value = cfg.camId || "";
   $("sMirror").value = String(!!cfg.mirror); $("sDur").value = cfg.durationSec; $("sCount").value = cfg.countdownSec;
   $("sEffect").value = cfg.effect; $("sSlow").value = cfg.slowSec; $("sRev").value = cfg.reverseSec; $("sMusic").value = String(!!cfg.music);
-  $("sTitle").value = cfg.title || ""; $("sUrl").value = cfg.scriptUrl || ""; $("sToken").value = cfg.token || "";
+  $("sTitle").value = cfg.title || ""; $("sUrl").value = cfg.scriptUrl || ""; $("sToken").value = cfg.token || ""; $("sPin").value = cfg.pin || "1234";
   $("sInfo").innerHTML = "Google Drive : " + (cfg.scriptUrl && cfg.token ? '<span class="ok">configure</span>' : '<span class="ko">non configure</span>')
     + "<br>Musique : " + (musicOk ? "music.mp3" : "aucune") + " &middot; Cadre : " + (overlayImg ? "overlay.png" : "aucun")
     + "<br>Format : " + (pickMime() || "?") + " &middot; " + W + "x" + H;
@@ -579,6 +598,7 @@ async function saveSettings() {
   cfg.durationSec = +$("sDur").value || 8; cfg.countdownSec = +$("sCount").value; cfg.effect = $("sEffect").value;
   cfg.slowSec = +$("sSlow").value; cfg.reverseSec = +$("sRev").value; cfg.music = $("sMusic").value === "true";
   cfg.title = $("sTitle").value.trim(); cfg.scriptUrl = $("sUrl").value.trim(); cfg.token = $("sToken").value.trim();
+  if (/^\d{4,8}$/.test($("sPin").value.trim())) cfg.pin = $("sPin").value.trim();
   saveCfg(); closeSettings(); applyUi();
   try { await startCamera(); } catch (e) {}
 }
@@ -588,6 +608,31 @@ async function testDrive() {
   try { var j = await (await fetch(u)).json(); $("sInfo").innerHTML = j.ok ? '<span class="ok">Google Drive OK</span> - dossier : ' + j.folder : '<span class="ko">Erreur</span>'; }
   catch (e) { $("sInfo").innerHTML = '<span class="ko">Impossible de joindre le script</span> : ' + e.message; }
 }
+
+// ---------- kiosk: hidden settings (press 2 s in the top-right corner, then admin code) ----------
+(function () {
+  var t = null, hc = $("hotCorner");
+  function start(e) { e.preventDefault(); t = setTimeout(openPin, 2000); }
+  function stop() { clearTimeout(t); }
+  hc.addEventListener("touchstart", start, { passive: false }); hc.addEventListener("touchend", stop); hc.addEventListener("touchcancel", stop);
+  hc.addEventListener("mousedown", start); hc.addEventListener("mouseup", stop); hc.addEventListener("mouseleave", stop);
+})();
+function openPin() { if (busy) return; $("pinIn").value = ""; $("pinErr").textContent = ""; $("pinBox").classList.add("on"); setTimeout(function () { $("pinIn").focus(); }, 50); }
+function closePin() { $("pinBox").classList.remove("on"); }
+function checkPin() {
+  if ($("pinIn").value === String(cfg.pin || "1234")) { closePin(); openSettings(); }
+  else { $("pinErr").textContent = "Code incorrect"; $("pinIn").value = ""; }
+}
+$("pinIn").addEventListener("keydown", function (e) { if (e.key === "Enter") checkPin(); });
+// no pinch-zoom / double-tap zoom / long-press menus on the booth screen
+document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+// full screen on first touch when the browser allows it (Home Screen icon is already full screen)
+function goFullscreen() {
+  var d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen;
+  if (f && !document.fullscreenElement && !document.webkitFullscreenElement && !window.navigator.standalone) { try { f.call(d); } catch (e) {} }
+}
+document.addEventListener("click", goFullscreen, { once: true });
 
 // keep the screen awake
 var wake = null;
