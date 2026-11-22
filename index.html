@@ -103,6 +103,12 @@
   .btnP { border:0; border-radius:40px; padding:15px 40px; font-size:19px; font-weight:800; color:#fff; background:var(--grad); cursor:pointer; box-shadow:0 10px 26px rgba(163,92,255,.4); font-family:inherit; }
   .btnG { border:1px solid var(--line); border-radius:40px; padding:12px 24px; font-size:16px; font-weight:700; color:var(--ink); background:#fff; cursor:pointer; font-family:inherit; }
   #autoTxt { color:var(--muted); font-size:13px; }
+  .stBox { display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; padding:8px 14px; border-radius:30px; background:#f6f3ff; }
+  .stDot { width:10px; height:10px; border-radius:50%; background:#a35cff; }
+  .stBox.work .stDot { animation:blink 1s infinite; }
+  .stBox.ok { background:#e7f8ee; color:#137a3b; } .stBox.ok .stDot { background:#22c55e; }
+  .stBox.fail { background:#ffe8ec; color:#b4232c; } .stBox.fail .stDot { background:#ff3b5c; }
+  .btnP:disabled { opacity:.45; box-shadow:none; }
 
   #gear { position:fixed; top:max(16px,env(safe-area-inset-top)); right:16px; z-index:20; width:46px; height:46px; border-radius:50%; border:0; background:rgba(255,255,255,.85);
     box-shadow:0 6px 20px rgba(0,0,0,.12); cursor:pointer; display:grid; place-items:center; opacity:.55; }
@@ -182,7 +188,10 @@
       <span class="pill"><i style="background:#ff5e8a"></i>Instagram</span>
     </div>
     <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-      <button class="btnP" onclick="reset()">Suivant</button>
+      <div class="stBox work" id="stBox"><span class="stDot"></span><span id="stTxt">Effet 360 en cours...</span></div>
+      <div class="pbar" style="width:260px"><b id="pb2"></b></div>
+      <button class="btnP" id="nextBtn" onclick="reset()">Suivant</button>
+      <button class="btnP" id="resendBtn" style="display:none" onclick="sendInBackground()">Renvoyer</button>
       <div id="autoTxt"></div>
     </div>
   </div>
@@ -265,7 +274,7 @@ function saveCfg() { try { localStorage.setItem("booth360", JSON.stringify(cfg))
 
 function show(id) { ["idle", "countL", "busy", "errL", "done"].forEach(function (l) { $(l).classList.toggle("on", l === id); }); }
 function setDots(n) { [1, 2, 3].forEach(function (i) { $("d" + i).classList.toggle("on", i <= n); }); }
-function setProg(p) { $("pb").style.width = Math.round(Math.max(0, Math.min(1, p)) * 100) + "%"; }
+function setProg(p) { var w = Math.round(Math.max(0, Math.min(1, p)) * 100) + "%"; $("pb").style.width = w; if ($("pb2")) $("pb2").style.width = w; }
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 // timer-driven loop (not tied to screen refresh, so capture/render keep their pace even if painting is throttled)
 function tick(fn) { setTimeout(fn, 4); }
@@ -386,7 +395,7 @@ async function renderVideo(frames, T, audioCtx) {
     srcNode.connect(gain); gain.connect(dest);
     tracks = tracks.concat(dest.stream.getAudioTracks());
   }
-  var mime = pickMime(), opts = { videoBitsPerSecond: 5000000 };
+  var mime = pickMime(), opts = { videoBitsPerSecond: 3500000 };
   if (mime) opts.mimeType = mime;
   var rec = new MediaRecorder(new MediaStream(tracks), opts), chunks = [];
   rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
@@ -429,20 +438,27 @@ function blobToBase64(blob) {
     fr.onerror = rej; fr.readAsDataURL(blob);
   });
 }
-function newName(type) {
+// random video code, known before the video exists, so the QR can be shown right after recording
+function newCode() {
   var a = "abcdefghjkmnpqrstuvwxyz23456789", s = "", r = new Uint8Array(10); crypto.getRandomValues(r);
   for (var i = 0; i < r.length; i++) s += a[r[i] % a.length];
-  return "video360-" + s + (type.indexOf("webm") >= 0 ? ".webm" : ".mp4");
+  return s;
 }
-async function uploadDrive(blob) {
+async function uploadDrive(blob, code) {
   if (!driveReady()) throw new Error("Google Drive n'est pas configure (Reglages).");
   var data = await blobToBase64(blob);
-  var res = await fetch(cfg.scriptUrl, { method: "POST", body: JSON.stringify({ token: cfg.token, name: newName(blob.type), data: data }) });
+  var name = "video360-" + code + (blob.type.indexOf("webm") >= 0 ? ".webm" : ".mp4");
+  var res = await fetch(cfg.scriptUrl, { method: "POST", body: JSON.stringify({ token: cfg.token, name: name, data: data }) });
   var j = await res.json();
   if (!j.ok) throw new Error("Google Drive : " + (j.error || "erreur"));
   return j.id;
 }
-function guestUrl(id) { return new URL("v.html?id=" + encodeURIComponent(id), location.href).href; }
+// guest page finds the video on Drive by its code (it waits if the video is still being prepared)
+function guestUrl(code) {
+  var dep = (cfg.scriptUrl.match(/\/s\/([A-Za-z0-9_-]+)\/exec/) || [])[1] || "";
+  return new URL("v.html?n=" + code + (dep && dep !== DEFAULT_DEPLOY ? "&d=" + dep : ""), location.href).href;
+}
+var DEFAULT_DEPLOY = "AKfycbyGblQX3kFvihHw2FKqc6GCv685PYF9e54ieQeUJkML-cukNgLEFZMu5j9Bp3VHx9QWew";
 
 // ---------- flow ----------
 function driveReady() { return !!(cfg.scriptUrl && cfg.token); }
@@ -476,11 +492,21 @@ async function go() {
     $("rec").classList.remove("on"); $("barWrap").classList.remove("on"); $("bar").style.width = "0";
     if (frames.length < 10) throw new Error("Pas assez d'images capturees. Verifiez la camera.");
 
-    show("busy"); setDots(1); setProg(0.05); $("busyTxt").textContent = "Effet 360 en cours...";
+    // QR codes right away: the guest page waits for the video while the iPad prepares and sends it
+    var code = newCode(), link = guestUrl(code);
+    lastResult = { code: code };
+    QR.draw($("qr"), link, 600);
+    QR.draw($("qrWa"), "https://wa.me/?text=" + encodeURIComponent("Ma video 360 : " + link), 600);
+    $("preview").removeAttribute("src"); $("preview").poster = frames[Math.floor(frames.length / 2)] ? URL.createObjectURL(frames[Math.floor(frames.length / 2)].b) : "";
+    setDoneState("work", "Effet 360 en cours...");
+    show("done");
+
     var video = await renderVideo(frames, frames[frames.length - 1].t, audioCtx);
     frames = null;
-    lastResult = { blob: video };
-    await sendAndShow();
+    lastResult.blob = video;
+    lastResult.url = URL.createObjectURL(video);
+    $("preview").src = lastResult.url;
+    await sendInBackground();
   } catch (e) {
     $("err").textContent = e.message || String(e);
     $("retryBtn").style.display = "none";
@@ -488,26 +514,26 @@ async function go() {
   } finally { if (audioCtx) audioCtx.close().catch(function () {}); }
 }
 
-async function sendAndShow() {
+// done-screen status: work (preparing/sending), ok (ready), fail (send again)
+function setDoneState(state, txt) {
+  $("stTxt").textContent = txt;
+  $("stBox").className = "stBox " + state;
+  $("nextBtn").disabled = state === "work";
+  $("resendBtn").style.display = state === "fail" ? "" : "none";
+  $("nextBtn").style.display = state === "fail" ? "none" : "";
+}
+async function sendInBackground() {
   try {
-    show("busy"); setDots(2); setProg(0.75); $("busyTxt").textContent = "Envoi vers Google Drive...";
-    var id = await uploadDrive(lastResult.blob);
-    setDots(3); setProg(1);
-    var link = guestUrl(id);
-    QR.draw($("qr"), link, 600);
-    QR.draw($("qrWa"), "https://wa.me/?text=" + encodeURIComponent("Ma video 360 : " + link), 600);
-    if (lastResult.url) URL.revokeObjectURL(lastResult.url);
-    lastResult.url = URL.createObjectURL(lastResult.blob);
-    $("preview").src = lastResult.url;
-    show("done");
-    startAutoBack(120);
+    setDoneState("work", "Envoi vers Google Drive..."); setProg(0.8);
+    await uploadDrive(lastResult.blob, lastResult.code);
+    setProg(1);
+    setDoneState("ok", "Video prete ! Les invites peuvent la telecharger.");
+    startAutoBack(90);
   } catch (e) {
-    $("err").textContent = (e.message || String(e)) + " Verifiez internet puis renvoyez.";
-    $("retryBtn").style.display = "";
-    show("errL");
+    setDoneState("fail", "Envoi impossible (" + (e.message || e) + "). Verifiez internet.");
   }
 }
-$("retryBtn").onclick = function () { if (lastResult) sendAndShow(); };
+$("retryBtn").onclick = function () { if (lastResult && lastResult.blob) { show("done"); sendInBackground(); } };
 
 function startAutoBack(sec) {
   clearInterval(autoTick);
@@ -517,6 +543,7 @@ function startAutoBack(sec) {
 }
 function reset() {
   clearInterval(autoTick);
+  if ($("preview").poster) { URL.revokeObjectURL($("preview").poster); $("preview").removeAttribute("poster"); }
   $("preview").removeAttribute("src"); $("preview").load();
   if (lastResult && lastResult.url) URL.revokeObjectURL(lastResult.url);
   lastResult = null; busy = false;
@@ -527,7 +554,8 @@ document.addEventListener("keydown", function (e) {
   if ($("settings").classList.contains("on")) return;
   if (e.code === "Space" || e.code === "Enter" || e.code === "PageDown" || e.code === "ArrowRight" || e.code === "AudioVolumeUp") {
     e.preventDefault();
-    if ($("done").classList.contains("on")) reset(); else if ($("idle").classList.contains("on")) go();
+    if ($("done").classList.contains("on")) { if (!$("nextBtn").disabled && $("nextBtn").style.display !== "none") reset(); }
+    else if ($("idle").classList.contains("on")) go();
   }
 });
 

@@ -19,9 +19,16 @@ h1 span{background:linear-gradient(135deg,#ff5e8a,#a35cff 50%,#38bdf8);-webkit-b
 .phone{border-radius:22px;padding:6px;background:#14121f}
 .player{position:relative;width:100%;aspect-ratio:9/16;max-height:62vh;margin:0 auto;border-radius:17px;overflow:hidden;background:#000}
 .player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.wait{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;text-align:center;padding:20px;
+ background:linear-gradient(160deg,#2a1b4a,#14121f)}
+.wait b{font-size:18px}.wait small{opacity:.75;font-size:13px;line-height:1.5}
+.spin{width:64px;height:64px;border-radius:50%;background:conic-gradient(#ff5e8a,#a35cff,#38bdf8,transparent 80%);animation:r 1s linear infinite;
+ -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 8px),#000 calc(100% - 7px));mask:radial-gradient(farthest-side,transparent calc(100% - 8px),#000 calc(100% - 7px))}
+@keyframes r{to{transform:rotate(360deg)}}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .tile{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px;border-radius:20px;background:#f8f6ff;border:1px solid #ece8f6;color:#1e1b33;text-decoration:none}
 .tile:active{transform:scale(.97)}
+.tile.off{opacity:.45;pointer-events:none}
 .tile b{font-size:15px}.tile small{color:#6f6a86;font-size:12px;line-height:1.3}
 .tile.big{grid-column:1/-1;flex-direction:row;align-items:center;background:linear-gradient(135deg,#ff5e8a,#a35cff 50%,#38bdf8);border:0;color:#fff}
 .tile.big small{color:rgba(255,255,255,.88)}
@@ -37,28 +44,54 @@ h1 span{background:linear-gradient(135deg,#ff5e8a,#a35cff 50%,#38bdf8);-webkit-b
   <div class="top"><div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></div>Booth 360</div>
   <h1>Votre video <span>360</span></h1>
   <div class="card" id="card">
-    <div class="phone"><div class="player"><iframe id="player" allow="autoplay; fullscreen" allowfullscreen></iframe></div></div>
+    <div class="phone"><div class="player">
+      <iframe id="player" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      <div class="wait" id="wait"><div class="spin"></div><b>Votre video arrive...</b><small>Elle est en cours de preparation.<br>Restez sur cette page, elle s'affichera toute seule.</small></div>
+    </div></div>
     <div class="grid">
-      <a class="tile big" id="dl"><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span>
+      <a class="tile big off" id="dl"><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span>
         <span><b>Telecharger la video</b><br><small>Puis Partager &rarr; Enregistrer la video, AirDrop, Instagram...</small></span></a>
       <a class="tile" id="wa"><span class="chip cWa"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-3.3-.8-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l2 1c.3.1.5.2.5.3.1.1.1.6-.1 1.2z"/></svg></span><b>WhatsApp</b><small>Envoyer le lien</small></a>
-      <a class="tile" id="drive"><span class="chip cDr"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M8 3h8l6 10-4 7H6l-4-7z"/><path d="M8 3l6 10h8M2 13h12l4 7"/></svg></span><b>Google Drive</b><small>Ouvrir la video</small></a>
+      <a class="tile off" id="drive"><span class="chip cDr"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M8 3h8l6 10-4 7H6l-4-7z"/><path d="M8 3l6 10h8M2 13h12l4 7"/></svg></span><b>Google Drive</b><small>Ouvrir la video</small></a>
     </div>
   </div>
   <p class="muted" id="note">Video disponible pendant 24 heures.</p>
 </div>
 <script>
 (function () {
-  var id = new URLSearchParams(location.search).get("id") || "";
-  if (!/^[A-Za-z0-9_-]{10,80}$/.test(id)) {
-    document.getElementById("card").innerHTML = '<p class="muted">Lien invalide.</p>';
-    return;
+  var DEFAULT_DEPLOY = "AKfycbyGblQX3kFvihHw2FKqc6GCv685PYF9e54ieQeUJkML-cukNgLEFZMu5j9Bp3VHx9QWew";
+  var q = new URLSearchParams(location.search);
+  var id = q.get("id") || "", code = q.get("n") || "", dep = q.get("d") || DEFAULT_DEPLOY;
+  var $ = function (x) { return document.getElementById(x); };
+  $("wa").href = "https://wa.me/?text=" + encodeURIComponent("Ma video 360 : " + location.href);
+
+  function showVideo(fileId) {
+    var e = encodeURIComponent(fileId);
+    $("player").src = "https://drive.google.com/file/d/" + e + "/preview";
+    $("dl").href = "https://drive.google.com/uc?export=download&id=" + e;
+    $("drive").href = "https://drive.google.com/file/d/" + e + "/view";
+    $("dl").classList.remove("off"); $("drive").classList.remove("off");
+    setTimeout(function () { $("wait").style.display = "none"; }, 600);
   }
-  var e = encodeURIComponent(id);
-  document.getElementById("player").src = "https://drive.google.com/file/d/" + e + "/preview";
-  document.getElementById("dl").href = "https://drive.google.com/uc?export=download&id=" + e;
-  document.getElementById("drive").href = "https://drive.google.com/file/d/" + e + "/view";
-  document.getElementById("wa").href = "https://wa.me/?text=" + encodeURIComponent("Ma video 360 : " + location.href);
+  function invalid(msg) { $("card").innerHTML = '<p class="muted">' + msg + '</p>'; }
+
+  if (/^[A-Za-z0-9_-]{10,80}$/.test(id)) { showVideo(id); return; }
+  if (!/^[a-z0-9]{6,20}$/.test(code) || !/^[A-Za-z0-9_-]{20,120}$/.test(dep)) { invalid("Lien invalide."); return; }
+
+  // the video may still be on its way from the booth: ask Google Drive every few seconds
+  var tries = 0;
+  function poll() {
+    tries++;
+    fetch("https://script.google.com/macros/s/" + dep + "/exec?n=" + code)
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j.ok && j.ready && j.id) showVideo(j.id);
+        else if (tries < 120) setTimeout(poll, 3000);
+        else invalid("Video introuvable ou expiree (les videos sont gardees 24 heures).");
+      })
+      .catch(function () { if (tries < 120) setTimeout(poll, 4000); });
+  }
+  poll();
 })();
 </script>
 </body>
