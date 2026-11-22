@@ -240,6 +240,14 @@ function saveCfg() { try { localStorage.setItem("booth360", JSON.stringify(cfg))
 
 // one-time setup link: index.html#setup=<base64 {u,k,t}>
 (function readSetup() {
+  // short form: #s=<apps script deployment id>.<secret key>
+  var sh = location.hash.match(/[#&]s=([A-Za-z0-9_-]+)\.([A-Za-z0-9]+)/);
+  if (sh) {
+    cfg.scriptUrl = "https://script.google.com/macros/s/" + sh[1] + "/exec"; cfg.token = sh[2];
+    saveCfg(); history.replaceState(null, "", location.pathname);
+    setTimeout(function () { alert("Google Drive configure sur cet iPad."); }, 300);
+    return;
+  }
   var m = location.hash.match(/setup=([^&]+)/);
   if (!m) return;
   try {
