@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#efe4ff">
+<title>Video 360</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100vh;font-family:-apple-system,"SF Pro Display","Segoe UI",Roboto,sans-serif;color:#1e1b33;
+ background:linear-gradient(160deg,#ffe3ef 0%,#efe4ff 45%,#dff3ff 100%);display:flex;justify-content:center}
+.wrap{width:100%;max-width:480px;padding:18px 16px 36px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.top{display:flex;align-items:center;gap:10px;font-weight:800;font-size:16px;align-self:flex-start}
+.logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,#ff5e8a,#a35cff 50%,#38bdf8);display:grid;place-items:center;box-shadow:0 6px 16px rgba(163,92,255,.35)}
+.logo svg{width:19px;height:19px}
+h1{font-size:26px;font-weight:900;margin:2px 0 0;text-align:center;line-height:1.15}
+h1 span{background:linear-gradient(135deg,#ff5e8a,#a35cff 50%,#38bdf8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.card{width:100%;background:#fff;border-radius:28px;padding:14px;box-shadow:0 20px 60px rgba(76,48,140,.16);display:flex;flex-direction:column;gap:14px}
+.phone{border-radius:22px;padding:6px;background:#14121f}
+.player{position:relative;width:100%;aspect-ratio:9/16;max-height:62vh;margin:0 auto;border-radius:17px;overflow:hidden;background:#000}
+.player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px;border-radius:20px;background:#f8f6ff;border:1px solid #ece8f6;color:#1e1b33;text-decoration:none}
+.tile:active{transform:scale(.97)}
+.tile b{font-size:15px}.tile small{color:#6f6a86;font-size:12px;line-height:1.3}
+.tile.big{grid-column:1/-1;flex-direction:row;align-items:center;background:linear-gradient(135deg,#ff5e8a,#a35cff 50%,#38bdf8);border:0;color:#fff}
+.tile.big small{color:rgba(255,255,255,.88)}
+.chip{width:40px;height:40px;flex:none;border-radius:50%;display:grid;place-items:center;color:#fff}
+.chip svg{width:21px;height:21px}
+.big .chip{background:rgba(255,255,255,.25)}
+.cWa{background:#25d366}.cDr{background:linear-gradient(135deg,#fbbc04,#34a853)}
+.muted{color:#6f6a86;font-size:13px;text-align:center;line-height:1.55}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></div>Booth 360</div>
+  <h1>Votre video <span>360</span></h1>
+  <div class="card" id="card">
+    <div class="phone"><div class="player"><iframe id="player" allow="autoplay; fullscreen" allowfullscreen></iframe></div></div>
+    <div class="grid">
+      <a class="tile big" id="dl"><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span>
+        <span><b>Telecharger la video</b><br><small>Puis Partager &rarr; Enregistrer la video, AirDrop, Instagram...</small></span></a>
+      <a class="tile" id="wa"><span class="chip cWa"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-3.3-.8-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l2 1c.3.1.5.2.5.3.1.1.1.6-.1 1.2z"/></svg></span><b>WhatsApp</b><small>Envoyer le lien</small></a>
+      <a class="tile" id="drive"><span class="chip cDr"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M8 3h8l6 10-4 7H6l-4-7z"/><path d="M8 3l6 10h8M2 13h12l4 7"/></svg></span><b>Google Drive</b><small>Ouvrir la video</small></a>
+    </div>
+  </div>
+  <p class="muted" id="note">Video disponible pendant 24 heures.</p>
+</div>
+<script>
+(function () {
+  var id = new URLSearchParams(location.search).get("id") || "";
+  if (!/^[A-Za-z0-9_-]{10,80}$/.test(id)) {
+    document.getElementById("card").innerHTML = '<p class="muted">Lien invalide.</p>';
+    return;
+  }
+  var e = encodeURIComponent(id);
+  document.getElementById("player").src = "https://drive.google.com/file/d/" + e + "/preview";
+  document.getElementById("dl").href = "https://drive.google.com/uc?export=download&id=" + e;
+  document.getElementById("drive").href = "https://drive.google.com/file/d/" + e + "/view";
+  document.getElementById("wa").href = "https://wa.me/?text=" + encodeURIComponent("Ma video 360 : " + location.href);
+})();
+</script>
+</body>
+</html>

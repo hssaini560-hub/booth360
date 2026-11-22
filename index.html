@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Booth 360">
+<title>Booth 360</title>
+<style>
+  :root {
+    --ink:#1e1b33; --muted:#6f6a86; --card:#ffffff; --line:#ece8f6;
+    --violet:#8b5cf6; --wa:#25d366; --red:#ff3b5c;
+    --grad:linear-gradient(135deg,#ff5e8a 0%,#a35cff 50%,#38bdf8 100%);
+    --soft:linear-gradient(160deg,#ffe3ef 0%,#efe4ff 45%,#dff3ff 100%);
+    --shadow:0 20px 60px rgba(76,48,140,.18);
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; overflow:hidden; user-select:none; -webkit-user-select:none; color:var(--ink);
+    font-family:-apple-system,"SF Pro Display","Segoe UI",Roboto,sans-serif; background:var(--soft); }
+  .blob { position:fixed; border-radius:50%; filter:blur(70px); opacity:.55; z-index:0; animation:float 18s ease-in-out infinite; }
+  .b1 { width:60vw; height:60vw; background:#ff9ec0; left:-20vw; top:-20vw; }
+  .b2 { width:55vw; height:55vw; background:#b79bff; right:-18vw; top:30vh; animation-delay:-6s; }
+  .b3 { width:60vw; height:60vw; background:#8fdcff; left:10vw; bottom:-30vw; animation-delay:-12s; }
+  @keyframes float { 50% { transform:translate(4vw,-3vh) scale(1.08); } }
+
+  #app { position:fixed; inset:0; z-index:1; display:flex; align-items:center; justify-content:center; padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom)); }
+  #frame { position:relative; height:100%; max-width:100%; aspect-ratio:9/16; border-radius:32px; overflow:hidden; background:#111;
+    box-shadow:0 30px 80px rgba(60,30,120,.35), 0 0 0 6px rgba(255,255,255,.7); }
+  #cam { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  #cam.mirror { transform:scaleX(-1); }
+  #overlayImg { position:absolute; inset:0; width:100%; height:100%; object-fit:fill; pointer-events:none; display:none; }
+  .shade { position:absolute; left:0; right:0; bottom:0; height:45%; background:linear-gradient(transparent,rgba(20,10,40,.65)); pointer-events:none; }
+  .topbar { position:absolute; top:18px; left:18px; right:18px; display:flex; align-items:center; gap:10px; }
+  .brand { display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.9); padding:7px 14px 7px 7px; border-radius:30px; font-weight:800; font-size:15px; box-shadow:0 6px 18px rgba(0,0,0,.15); }
+  .logo { width:32px; height:32px; border-radius:50%; background:var(--grad); display:grid; place-items:center; }
+  .logo svg { width:18px; height:18px; }
+  #evTitle { position:absolute; left:0; right:0; top:80px; text-align:center; color:#fff; font-weight:900; font-size:clamp(24px,4vh,40px); padding:0 24px; text-shadow:0 4px 20px rgba(0,0,0,.45); }
+
+  .layer { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:18px; text-align:center; padding:24px; }
+  .layer.on { display:flex; }
+  #idle { justify-content:flex-end; padding-bottom:8%; }
+  #startBtn { position:relative; width:min(38%,200px); aspect-ratio:1; border-radius:50%; border:0; cursor:pointer; background:var(--grad);
+    box-shadow:0 14px 40px rgba(163,92,255,.55); display:grid; place-items:center; }
+  #startBtn::before,#startBtn::after { content:""; position:absolute; inset:-14px; border-radius:50%; border:3px solid rgba(255,255,255,.7); animation:ring 2.2s ease-out infinite; }
+  #startBtn::after { animation-delay:1.1s; }
+  @keyframes ring { from { transform:scale(.85); opacity:1; } to { transform:scale(1.35); opacity:0; } }
+  #startBtn svg { width:38%; height:38%; margin-left:8%; }
+  .tapTxt { color:#fff; font-size:clamp(18px,2.6vh,28px); font-weight:800; text-shadow:0 2px 12px rgba(0,0,0,.4); }
+  .tapTxt small { display:block; font-weight:500; font-size:.68em; opacity:.85; margin-top:4px; }
+
+  #countL { background:rgba(20,10,40,.25); }
+  .countRing { position:relative; width:min(62%,340px); aspect-ratio:1; display:grid; place-items:center; }
+  .countRing svg { position:absolute; inset:0; transform:rotate(-90deg); }
+  .countRing circle { fill:none; stroke-width:10; }
+  #countArc { stroke:url(#gr); stroke-linecap:round; stroke-dasharray:597; stroke-dashoffset:0; }
+  #count { font-size:min(22vh,160px); font-weight:900; color:#fff; text-shadow:0 8px 30px rgba(0,0,0,.35); animation:pop .9s ease-out; }
+  @keyframes pop { from { transform:scale(1.6); opacity:0; } to { transform:scale(1); opacity:1; } }
+
+  #rec { position:absolute; top:18px; left:50%; transform:translateX(-50%); display:none; align-items:center; gap:10px; z-index:3;
+    background:rgba(255,255,255,.92); color:var(--ink); padding:8px 16px; border-radius:30px; font-size:18px; font-weight:800; box-shadow:0 8px 24px rgba(0,0,0,.2); }
+  #rec.on { display:flex; }
+  #frame:has(#rec.on) #topbar { display:none; }
+  #rec i { width:12px; height:12px; border-radius:50%; background:var(--red); animation:blink 1s infinite; }
+  @keyframes blink { 50% { opacity:.2; } }
+  #barWrap { position:absolute; left:18px; right:18px; bottom:18px; height:10px; border-radius:10px; background:rgba(255,255,255,.35); display:none; overflow:hidden; z-index:3; }
+  #barWrap.on { display:block; }
+  #bar { height:100%; width:0; background:var(--grad); border-radius:10px; }
+
+  .glass { background:#fff; border-radius:26px; padding:28px 26px; box-shadow:var(--shadow); width:min(86%,380px); display:flex; flex-direction:column; align-items:center; gap:16px; }
+  .spin { width:72px; height:72px; border-radius:50%; background:conic-gradient(from 0deg,#ff5e8a,#a35cff,#38bdf8,transparent 80%); animation:r 1s linear infinite;
+    -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 9px),#000 calc(100% - 8px)); mask:radial-gradient(farthest-side,transparent calc(100% - 9px),#000 calc(100% - 8px)); }
+  @keyframes r { to { transform:rotate(360deg); } }
+  #busyTxt { font-size:20px; font-weight:800; }
+  .pbar { width:100%; height:8px; border-radius:8px; background:var(--line); overflow:hidden; }
+  .pbar b { display:block; height:100%; width:0; background:var(--grad); transition:width .3s; }
+  .dots { display:flex; gap:8px; } .dots b { width:10px; height:10px; border-radius:50%; background:var(--line); }
+  .dots b.on { background:var(--violet); }
+  #err { color:#d12c4a; font-size:17px; font-weight:600; }
+
+  #done { position:fixed; inset:0; z-index:10; display:none; align-items:center; justify-content:center; padding:20px; background:var(--soft); }
+  #done.on { display:flex; }
+  .doneCard { background:var(--card); border-radius:32px; box-shadow:var(--shadow); padding:clamp(18px,3vh,34px) clamp(16px,3vw,34px);
+    display:flex; flex-direction:column; align-items:center; gap:clamp(12px,2vh,22px); width:min(720px,100%); max-height:100%; overflow:auto; }
+  .doneCard h2 { margin:0; font-size:clamp(24px,3.4vh,38px); font-weight:900; text-align:center; }
+  .doneCard h2 span { background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub { color:var(--muted); font-size:clamp(14px,1.8vh,18px); margin-top:-8px; text-align:center; }
+  .phone { border-radius:26px; padding:7px; background:#14121f; box-shadow:0 18px 40px rgba(20,10,40,.3); }
+  #preview { display:block; height:min(34vh,420px); border-radius:20px; background:#000; aspect-ratio:9/16; object-fit:cover; }
+  .qrs { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
+  .qrTile { background:#fff; border:1px solid var(--line); border-radius:24px; padding:14px 14px 12px; display:flex; flex-direction:column; align-items:center; gap:10px; box-shadow:0 10px 30px rgba(76,48,140,.10); }
+  .qrHead { display:flex; align-items:center; gap:10px; font-weight:800; font-size:clamp(15px,2vh,20px); }
+  .chip { width:36px; height:36px; flex:none; border-radius:50%; display:grid; place-items:center; color:#fff; }
+  .chip svg { width:19px; height:19px; }
+  .qrTile canvas { display:block; width:min(24vh,38vw,260px); height:auto; image-rendering:pixelated; border-radius:8px; }
+  .qrTile.wa { border:2px solid var(--wa); }
+  .cWa { background:var(--wa); } .cDl { background:linear-gradient(135deg,#a35cff,#38bdf8); }
+  .c1 { background:linear-gradient(135deg,#ff5e8a,#ff8a5e); } .c2 { background:linear-gradient(135deg,#a35cff,#6d5cff); } .c3 { background:linear-gradient(135deg,#38bdf8,#22d3c5); }
+  .apps { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+  .pill { display:flex; align-items:center; gap:6px; padding:7px 12px; border-radius:30px; background:#f6f3ff; font-size:13px; font-weight:700; }
+  .pill i { width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .btnP { border:0; border-radius:40px; padding:15px 40px; font-size:19px; font-weight:800; color:#fff; background:var(--grad); cursor:pointer; box-shadow:0 10px 26px rgba(163,92,255,.4); font-family:inherit; }
+  .btnG { border:1px solid var(--line); border-radius:40px; padding:12px 24px; font-size:16px; font-weight:700; color:var(--ink); background:#fff; cursor:pointer; font-family:inherit; }
+  #autoTxt { color:var(--muted); font-size:13px; }
+
+  #gear { position:fixed; top:max(16px,env(safe-area-inset-top)); right:16px; z-index:20; width:46px; height:46px; border-radius:50%; border:0; background:rgba(255,255,255,.85);
+    box-shadow:0 6px 20px rgba(0,0,0,.12); cursor:pointer; display:grid; place-items:center; opacity:.55; }
+  #gear svg { width:22px; height:22px; }
+  #settings { position:fixed; inset:0; z-index:30; background:rgba(30,20,60,.35); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); display:none; align-items:center; justify-content:center; padding:16px; }
+  #settings.on { display:flex; }
+  .card { background:#fff; border-radius:26px; padding:24px; width:min(620px,100%); max-height:92vh; overflow:auto; box-shadow:var(--shadow); user-select:text; -webkit-user-select:text; }
+  .card h3 { margin:0 0 6px; font-size:24px; font-weight:900; }
+  .sec { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+  .sec h4 { margin:0 0 8px; display:flex; align-items:center; gap:10px; font-size:15px; }
+  .sec h4 .chip { width:30px; height:30px; } .sec h4 .chip svg { width:16px; height:16px; }
+  .row { display:grid; grid-template-columns:200px 1fr; gap:10px; align-items:center; margin:9px 0; }
+  .row label { color:var(--muted); font-size:14px; font-weight:600; }
+  select,input { width:100%; padding:11px 12px; border-radius:12px; border:1px solid var(--line); background:#faf9ff; color:var(--ink); font-size:16px; font-family:inherit; }
+  .info { font-size:13px; color:var(--muted); line-height:1.7; margin-top:14px; background:#f8f6ff; border-radius:14px; padding:12px 14px; word-break:break-all; }
+  .ok { color:#16a34a; font-weight:700; } .ko { color:#d12c4a; font-weight:700; }
+  .actions { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap; }
+  @media (max-width:600px) { .row { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <linearGradient id="gr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5e8a"/><stop offset=".5" stop-color="#a35cff"/><stop offset="1" stop-color="#38bdf8"/></linearGradient>
+</defs></svg>
+
+<div id="app">
+  <div id="frame">
+    <video id="cam" autoplay muted playsinline></video>
+    <img id="overlayImg" alt="">
+    <div class="shade"></div>
+    <div class="topbar" id="topbar"><div class="brand"><div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></div>Booth 360</div></div>
+    <div id="evTitle"></div>
+    <div id="idle" class="layer on">
+      <button id="startBtn" aria-label="Start"><svg viewBox="0 0 24 24" fill="#fff"><path d="M7 4.5v15l12.5-7.5z"/></svg></button>
+      <div class="tapTxt">Appuyez pour commencer<small>Video 360 &middot; ralenti &middot; effet retour</small></div>
+    </div>
+    <div id="countL" class="layer">
+      <div class="countRing">
+        <svg viewBox="0 0 220 220"><circle cx="110" cy="110" r="95" stroke="rgba(255,255,255,.3)"/><circle id="countArc" cx="110" cy="110" r="95"/></svg>
+        <div id="count">3</div>
+      </div>
+      <div class="tapTxt">Preparez-vous !</div>
+    </div>
+    <div id="busy" class="layer">
+      <div class="glass"><div class="spin"></div><div id="busyTxt">Effet 360 en cours...</div><div class="pbar"><b id="pb"></b></div>
+        <div class="dots"><b id="d1" class="on"></b><b id="d2"></b><b id="d3"></b></div></div>
+    </div>
+    <div id="errL" class="layer">
+      <div class="glass"><div id="err"></div><button class="btnP" id="retryBtn" style="display:none">Renvoyer</button><button class="btnG" onclick="reset()">Retour</button></div>
+    </div>
+    <div id="rec"><i></i><span>REC</span><span id="recT">0</span></div>
+    <div id="barWrap"><div id="bar"></div></div>
+  </div>
+</div>
+
+<div id="done">
+  <div class="doneCard">
+    <h2>Votre video est <span>prete !</span></h2>
+    <div class="sub">Scannez avec l'appareil photo de votre telephone</div>
+    <div class="phone"><video id="preview" autoplay muted loop playsinline></video></div>
+    <div class="qrs">
+      <div class="qrTile">
+        <div class="qrHead"><div class="chip cDl"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></div>Telecharger</div>
+        <canvas id="qr"></canvas>
+      </div>
+      <div class="qrTile wa">
+        <div class="qrHead"><div class="chip cWa"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-3.3-.8-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l2 1c.3.1.5.2.5.3.1.1.1.6-.1 1.2z"/></svg></div>WhatsApp</div>
+        <canvas id="qrWa"></canvas>
+      </div>
+    </div>
+    <div class="apps">
+      <span class="pill"><i style="background:#38bdf8"></i>AirDrop</span>
+      <span class="pill"><i style="background:#a35cff"></i>Photos</span>
+      <span class="pill"><i style="background:#25d366"></i>WhatsApp</span>
+      <span class="pill"><i style="background:#ff5e8a"></i>Instagram</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+      <button class="btnP" onclick="reset()">Suivant</button>
+      <div id="autoTxt"></div>
+    </div>
+  </div>
+</div>
+
+<button id="gear" onclick="openSettings()" aria-label="Reglages"><svg viewBox="0 0 24 24" fill="none" stroke="#1e1b33" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+
+<div id="settings">
+  <div class="card">
+    <h3>Reglages</h3>
+    <div class="sec"><h4><span class="chip c1"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></span>Camera</h4>
+      <div class="row"><label>Camera</label><select id="sCam"></select></div>
+      <div class="row"><label>Effet miroir</label><select id="sMirror"><option value="false">Non</option><option value="true">Oui</option></select></div>
+    </div>
+    <div class="sec"><h4><span class="chip c2"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></span>Video 360</h4>
+      <div class="row"><label>Duree d'enregistrement (s)</label><input id="sDur" type="number" min="3" max="20"></div>
+      <div class="row"><label>Compte a rebours (s)</label><input id="sCount" type="number" min="0" max="10"></div>
+      <div class="row"><label>Effet</label><select id="sEffect">
+        <option value="360">360 : normal + ralenti + marche arriere</option>
+        <option value="slowmo">Ralenti complet</option>
+        <option value="normal">Normal</option></select></div>
+      <div class="row"><label>Ralenti (s de fin)</label><input id="sSlow" type="number" min="0" max="10"></div>
+      <div class="row"><label>Marche arriere (s de fin)</label><input id="sRev" type="number" min="0" max="10"></div>
+      <div class="row"><label>Musique (music.mp3)</label><select id="sMusic"><option value="true">Oui</option><option value="false">Non</option></select></div>
+    </div>
+    <div class="sec"><h4><span class="chip c3"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></span>Partage</h4>
+      <div class="row"><label>Titre de l'evenement</label><input id="sTitle" type="text" placeholder="ex: Mariage Sara & Adam"></div>
+      <div class="row"><label>Google Drive (URL du script)</label><input id="sUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec"></div>
+      <div class="row"><label>Cle secrete</label><input id="sToken" type="password"></div>
+    </div>
+    <div class="info" id="sInfo"></div>
+    <div class="actions">
+      <button class="btnG" onclick="testDrive()">Tester Google Drive</button>
+      <button class="btnG" onclick="closeSettings()">Annuler</button>
+      <button class="btnP" onclick="saveSettings()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script src="qr.js"></script>
+<script>
+// ===== Booth 360 - iPad only =====
+// Records on the iPad, builds the 360 effect on the iPad (normal + slow motion + reverse),
+// uploads to Google Drive through the Apps Script web app, and shows QR codes for guests.
+var W = 720, H = 1280, FPS = 30;
+var $ = function (id) { return document.getElementById(id); };
+var DEF = { durationSec: 8, countdownSec: 3, effect: "360", slowSec: 3, reverseSec: 3, mirror: true, music: true, title: "", scriptUrl: "", token: "", camId: "" };
+var cfg = loadCfg(), stream = null, busy = false, autoTick = null, lastResult = null, musicOk = false, overlayImg = null;
+
+function loadCfg() {
+  var c = {}; try { c = JSON.parse(localStorage.getItem("booth360") || "{}"); } catch (e) {}
+  for (var k in DEF) if (!(k in c)) c[k] = DEF[k];
+  return c;
+}
+function saveCfg() { try { localStorage.setItem("booth360", JSON.stringify(cfg)); } catch (e) {} }
+
+// one-time setup link: index.html#setup=<base64 {u,k,t}>
+(function readSetup() {
+  var m = location.hash.match(/setup=([^&]+)/);
+  if (!m) return;
+  try {
+    var s = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1])))));
+    if (s.u) cfg.scriptUrl = s.u; if (s.k) cfg.token = s.k; if (s.t) cfg.title = s.t;
+    saveCfg();
+    history.replaceState(null, "", location.pathname);
+    setTimeout(function () { alert("Google Drive configure sur cet iPad."); }, 300);
+  } catch (e) {}
+})();
+
+function show(id) { ["idle", "countL", "busy", "errL", "done"].forEach(function (l) { $(l).classList.toggle("on", l === id); }); }
+function setDots(n) { [1, 2, 3].forEach(function (i) { $("d" + i).classList.toggle("on", i <= n); }); }
+function setProg(p) { $("pb").style.width = Math.round(Math.max(0, Math.min(1, p)) * 100) + "%"; }
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+// timer-driven loop (not tied to screen refresh, so capture/render keep their pace even if painting is throttled)
+function tick(fn) { setTimeout(fn, 4); }
+function applyUi() {
+  $("evTitle").textContent = cfg.title || "";
+  $("cam").classList.toggle("mirror", !!cfg.mirror);
+}
+
+// optional assets placed next to this page: music.mp3 and overlay.png
+fetch("music.mp3", { method: "HEAD" }).then(function (r) { musicOk = r.ok; }).catch(function () {});
+(function () { var i = new Image(); i.onload = function () { overlayImg = i; $("overlayImg").src = i.src; $("overlayImg").style.display = "block"; }; i.src = "overlay.png"; })();
+
+async function startCamera() {
+  if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("Camera non disponible (ouvrez la page en https dans Safari).");
+  var portrait = window.innerHeight >= window.innerWidth;
+  var v = portrait ? { width: { ideal: 1080 }, height: { ideal: 1920 }, frameRate: { ideal: 30 } } : { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } };
+  if (cfg.camId) v.deviceId = { exact: cfg.camId }; else v.facingMode = "user";
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: v, audio: false }); }
+  catch (e) { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); }
+  $("cam").srcObject = stream;
+  await $("cam").play().catch(function () {});
+}
+
+// ---------- capture: JPEG frames from the live camera (portrait 720x1280) ----------
+var cap = document.createElement("canvas"); cap.width = W; cap.height = H;
+var cx = cap.getContext("2d");
+function drawCover(ctx, src, sw, sh, mirror) {
+  var s = Math.max(W / sw, H / sh), dw = sw * s, dh = sh * s;
+  ctx.save();
+  if (mirror) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+  ctx.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  ctx.restore();
+}
+function captureFrames(dur) {
+  return new Promise(function (resolve) {
+    var cam = $("cam"), frames = [], t0 = performance.now(), next = 0;
+    function loop() {
+      var t = (performance.now() - t0) / 1000;
+      $("recT").textContent = Math.max(0, Math.ceil(dur - t)) + "s";
+      $("bar").style.width = Math.min(100, t / dur * 100) + "%";
+      if (t >= dur) {
+        Promise.all(frames.map(function (f) { return f.p; })).then(function (blobs) {
+          resolve(frames.map(function (f, i) { return { t: f.t, b: blobs[i] }; }).filter(function (f) { return f.b; }));
+        });
+        return;
+      }
+      if (t >= next && cam.videoWidth) {
+        drawCover(cx, cam, cam.videoWidth, cam.videoHeight, !!cfg.mirror);
+        frames.push({ t: t, p: new Promise(function (r) { cap.toBlob(r, "image/jpeg", 0.85); }) });
+        next += 1 / FPS; if (next < t) next = t + 0.5 / FPS;
+      }
+      tick(loop);
+    }
+    tick(loop);
+  });
+}
+
+// ---------- timeline: normal -> slow motion -> reverse ----------
+function buildTimeline(T) {
+  var S = Math.min(+cfg.slowSec || 0, T), R = Math.min(+cfg.reverseSec || 0, T), seg = [];
+  if (cfg.effect === "slowmo") seg.push({ a: 0, b: T, rate: 0.5 });
+  else if (cfg.effect === "normal") seg.push({ a: 0, b: T, rate: 1 });
+  else {
+    seg.push({ a: 0, b: T, rate: 1 });
+    if (S > 0) seg.push({ a: T - S, b: T, rate: 0.5 });
+    if (R > 0) seg.push({ a: T, b: T - R, rate: -1 });
+  }
+  var total = 0;
+  seg.forEach(function (s) { s.start = total; s.len = Math.abs(s.b - s.a) / Math.abs(s.rate); total += s.len; });
+  return { seg: seg, total: total };
+}
+function srcTimeAt(tl, tau) {
+  for (var i = 0; i < tl.seg.length; i++) {
+    var s = tl.seg[i];
+    if (tau < s.start + s.len || i === tl.seg.length - 1) {
+      var d = Math.min(tau - s.start, s.len) * Math.abs(s.rate);
+      return s.b > s.a ? s.a + d : s.a - d;
+    }
+  }
+  return 0;
+}
+function frameIndex(frames, t) {
+  var lo = 0, hi = frames.length - 1;
+  while (lo < hi) { var mid = (lo + hi + 1) >> 1; if (frames[mid].t <= t) lo = mid; else hi = mid - 1; }
+  return lo;
+}
+function pickMime() {
+  var l = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp8", "video/webm"];
+  for (var i = 0; i < l.length; i++) if (window.MediaRecorder && MediaRecorder.isTypeSupported(l[i])) return l[i];
+  return "";
+}
+
+// ---------- render the final video on a canvas, recorded in real time ----------
+async function renderVideo(frames, T, audioCtx) {
+  var tl = buildTimeline(T);
+  var out = document.createElement("canvas"); out.width = W; out.height = H;
+  var ctx = out.getContext("2d");
+  var cache = new Map();
+  function bmp(i) {
+    if (!cache.has(i)) cache.set(i, createImageBitmap(frames[i].b));
+    if (cache.size > 10) { var k = cache.keys().next().value; cache.get(k).then(function (b) { b.close && b.close(); }); cache.delete(k); }
+    return cache.get(i);
+  }
+  // first frame drawn before recording starts
+  ctx.drawImage(await bmp(0), 0, 0, W, H);
+  if (overlayImg) ctx.drawImage(overlayImg, 0, 0, W, H);
+
+  var vstream = out.captureStream(FPS);
+  var tracks = vstream.getVideoTracks().slice();
+  var musicEl = null, gain = null;
+  if (cfg.music && musicOk && audioCtx) {
+    musicEl = new Audio("music.mp3"); musicEl.loop = true;
+    var srcNode = audioCtx.createMediaElementSource(musicEl);
+    gain = audioCtx.createGain();
+    var dest = audioCtx.createMediaStreamDestination();
+    srcNode.connect(gain); gain.connect(dest);
+    tracks = tracks.concat(dest.stream.getAudioTracks());
+  }
+  var mime = pickMime(), opts = { videoBitsPerSecond: 5000000 };
+  if (mime) opts.mimeType = mime;
+  var rec = new MediaRecorder(new MediaStream(tracks), opts), chunks = [];
+  rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+  var stopped = new Promise(function (r) { rec.onstop = r; });
+
+  if (musicEl) { try { await musicEl.play(); gain.gain.setValueAtTime(1, audioCtx.currentTime); gain.gain.setValueAtTime(1, audioCtx.currentTime + Math.max(0, tl.total - 1.5)); gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + tl.total); } catch (e) {} }
+  rec.start(500);
+  var t0 = performance.now(), wanted = -1;
+  await new Promise(function (done) {
+    function loop() {
+      var tau = (performance.now() - t0) / 1000;
+      setProg(0.1 + 0.6 * Math.min(1, tau / tl.total));
+      if (tau >= tl.total) { done(); return; }
+      var i = frameIndex(frames, srcTimeAt(tl, tau));
+      if (i !== wanted) {
+        wanted = i;
+        bmp(i).then(function (b) {
+          if (i !== wanted) return; // a newer frame is already wanted
+          ctx.drawImage(b, 0, 0, W, H);
+          if (overlayImg) ctx.drawImage(overlayImg, 0, 0, W, H);
+        });
+        bmp(Math.min(frames.length - 1, i + 1)); bmp(Math.max(0, i - 1)); // prefetch both directions
+      }
+      tick(loop);
+    }
+    tick(loop);
+  });
+  rec.stop(); await stopped;
+  if (musicEl) musicEl.pause();
+  cache.forEach(function (p) { p.then(function (b) { b.close && b.close(); }); });
+  var type = (rec.mimeType || mime || "video/mp4").split(";")[0];
+  return new Blob(chunks, { type: type });
+}
+
+// ---------- Google Drive upload (Apps Script web app) ----------
+function blobToBase64(blob) {
+  return new Promise(function (res, rej) {
+    var fr = new FileReader();
+    fr.onload = function () { res(String(fr.result).split(",")[1]); };
+    fr.onerror = rej; fr.readAsDataURL(blob);
+  });
+}
+function newName(type) {
+  var a = "abcdefghjkmnpqrstuvwxyz23456789", s = "", r = new Uint8Array(10); crypto.getRandomValues(r);
+  for (var i = 0; i < r.length; i++) s += a[r[i] % a.length];
+  return "video360-" + s + (type.indexOf("webm") >= 0 ? ".webm" : ".mp4");
+}
+async function uploadDrive(blob) {
+  if (!cfg.scriptUrl || !cfg.token) throw new Error("Google Drive n'est pas configure (Reglages).");
+  var data = await blobToBase64(blob);
+  var res = await fetch(cfg.scriptUrl, { method: "POST", body: JSON.stringify({ token: cfg.token, name: newName(blob.type), data: data }) });
+  var j = await res.json();
+  if (!j.ok) throw new Error("Google Drive : " + (j.error || "erreur"));
+  return j.id;
+}
+function guestUrl(id) { return new URL("v.html?id=" + encodeURIComponent(id), location.href).href; }
+
+// ---------- flow ----------
+async function go() {
+  if (busy) return;
+  busy = true;
+  var audioCtx = null;
+  try { var AC = window.AudioContext || window.webkitAudioContext; if (AC) { audioCtx = new AC(); audioCtx.resume(); } } catch (e) {}
+  try {
+    var n = parseInt(cfg.countdownSec, 10) || 0;
+    if (n > 0) {
+      show("countL");
+      for (var i = n; i > 0; i--) {
+        var c = $("count"); c.textContent = i; c.style.animation = "none"; void c.offsetWidth; c.style.animation = "";
+        var arc = $("countArc"); arc.style.transition = "none"; arc.style.strokeDashoffset = "0"; void arc.offsetWidth;
+        arc.style.transition = "stroke-dashoffset 1s linear"; arc.style.strokeDashoffset = "597";
+        await sleep(1000);
+      }
+    }
+    show(null);
+    var dur = Math.max(3, Math.min(20, parseFloat(cfg.durationSec) || 8));
+    $("rec").classList.add("on"); $("barWrap").classList.add("on");
+    var frames = await captureFrames(dur);
+    $("rec").classList.remove("on"); $("barWrap").classList.remove("on"); $("bar").style.width = "0";
+    if (frames.length < 10) throw new Error("Pas assez d'images capturees. Verifiez la camera.");
+
+    show("busy"); setDots(1); setProg(0.05); $("busyTxt").textContent = "Effet 360 en cours...";
+    var video = await renderVideo(frames, frames[frames.length - 1].t, audioCtx);
+    frames = null;
+    lastResult = { blob: video };
+    await sendAndShow();
+  } catch (e) {
+    $("err").textContent = e.message || String(e);
+    $("retryBtn").style.display = "none";
+    show("errL");
+  } finally { if (audioCtx) audioCtx.close().catch(function () {}); }
+}
+
+async function sendAndShow() {
+  try {
+    show("busy"); setDots(2); setProg(0.75); $("busyTxt").textContent = "Envoi vers Google Drive...";
+    var id = await uploadDrive(lastResult.blob);
+    setDots(3); setProg(1);
+    var link = guestUrl(id);
+    QR.draw($("qr"), link, 600);
+    QR.draw($("qrWa"), "https://wa.me/?text=" + encodeURIComponent("Ma video 360 : " + link), 600);
+    if (lastResult.url) URL.revokeObjectURL(lastResult.url);
+    lastResult.url = URL.createObjectURL(lastResult.blob);
+    $("preview").src = lastResult.url;
+    show("done");
+    startAutoBack(120);
+  } catch (e) {
+    $("err").textContent = (e.message || String(e)) + " Verifiez internet puis renvoyez.";
+    $("retryBtn").style.display = "";
+    show("errL");
+  }
+}
+$("retryBtn").onclick = function () { if (lastResult) sendAndShow(); };
+
+function startAutoBack(sec) {
+  clearInterval(autoTick);
+  var left = sec;
+  $("autoTxt").textContent = "Retour automatique dans " + left + " s";
+  autoTick = setInterval(function () { left--; $("autoTxt").textContent = "Retour automatique dans " + left + " s"; if (left <= 0) reset(); }, 1000);
+}
+function reset() {
+  clearInterval(autoTick);
+  $("preview").removeAttribute("src"); $("preview").load();
+  if (lastResult && lastResult.url) URL.revokeObjectURL(lastResult.url);
+  lastResult = null; busy = false;
+  show("idle");
+}
+$("startBtn").addEventListener("click", go);
+document.addEventListener("keydown", function (e) {
+  if ($("settings").classList.contains("on")) return;
+  if (e.code === "Space" || e.code === "Enter" || e.code === "PageDown" || e.code === "ArrowRight" || e.code === "AudioVolumeUp") {
+    e.preventDefault();
+    if ($("done").classList.contains("on")) reset(); else if ($("idle").classList.contains("on")) go();
+  }
+});
+
+// ---------- settings ----------
+async function openSettings() {
+  var devs = [];
+  try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(function (d) { return d.kind === "videoinput"; }); } catch (e) {}
+  $("sCam").innerHTML = '<option value="">Camera avant (par defaut)</option>' + devs.map(function (d, i) { return '<option value="' + d.deviceId + '">' + (d.label || "Camera " + (i + 1)) + "</option>"; }).join("");
+  $("sCam").value = cfg.camId || "";
+  $("sMirror").value = String(!!cfg.mirror); $("sDur").value = cfg.durationSec; $("sCount").value = cfg.countdownSec;
+  $("sEffect").value = cfg.effect; $("sSlow").value = cfg.slowSec; $("sRev").value = cfg.reverseSec; $("sMusic").value = String(!!cfg.music);
+  $("sTitle").value = cfg.title || ""; $("sUrl").value = cfg.scriptUrl || ""; $("sToken").value = cfg.token || "";
+  $("sInfo").innerHTML = "Google Drive : " + (cfg.scriptUrl && cfg.token ? '<span class="ok">configure</span>' : '<span class="ko">non configure</span>')
+    + "<br>Musique : " + (musicOk ? "music.mp3" : "aucune") + " &middot; Cadre : " + (overlayImg ? "overlay.png" : "aucun")
+    + "<br>Format : " + (pickMime() || "?") + " &middot; " + W + "x" + H;
+  $("settings").classList.add("on");
+}
+function closeSettings() { $("settings").classList.remove("on"); }
+async function saveSettings() {
+  cfg.camId = $("sCam").value; cfg.mirror = $("sMirror").value === "true";
+  cfg.durationSec = +$("sDur").value || 8; cfg.countdownSec = +$("sCount").value; cfg.effect = $("sEffect").value;
+  cfg.slowSec = +$("sSlow").value; cfg.reverseSec = +$("sRev").value; cfg.music = $("sMusic").value === "true";
+  cfg.title = $("sTitle").value.trim(); cfg.scriptUrl = $("sUrl").value.trim(); cfg.token = $("sToken").value.trim();
+  saveCfg(); closeSettings(); applyUi();
+  try { await startCamera(); } catch (e) {}
+}
+async function testDrive() {
+  var u = $("sUrl").value.trim();
+  $("sInfo").textContent = "Test en cours...";
+  try { var j = await (await fetch(u)).json(); $("sInfo").innerHTML = j.ok ? '<span class="ok">Google Drive OK</span> - dossier : ' + j.folder : '<span class="ko">Erreur</span>'; }
+  catch (e) { $("sInfo").innerHTML = '<span class="ko">Impossible de joindre le script</span> : ' + e.message; }
+}
+
+// keep the screen awake
+var wake = null;
+async function keepAwake() { try { if (navigator.wakeLock && !wake) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", function () { wake = null; }); } } catch (e) {} }
+document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") keepAwake(); });
+document.addEventListener("click", keepAwake);
+
+(async function init() {
+  applyUi(); keepAwake();
+  try { await startCamera(); }
+  catch (e) { $("err").textContent = "Camera : " + (e.message || e); $("retryBtn").style.display = "none"; show("errL"); }
+})();
+</script>
+</body>
+</html>
